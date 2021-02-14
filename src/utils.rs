@@ -6,17 +6,25 @@ pub use uuid::Uuid;
 
 const RUST_LOG: &str = "RUST_LOG";
 
-pub fn init_logger() {
+pub fn init_logger(debug_mode: bool) {
     if env::var(RUST_LOG).is_err() {
         #[cfg(debug_assertions)]
-        env::set_var(RUST_LOG, "debug");
+        {
+            if debug_mode {
+                env::set_var(RUST_LOG, "trace");
+            } else {
+                env::set_var(RUST_LOG, "debug");
+            }
+        }
         #[cfg(not(debug_assertions))]
-        env::set_var(RUST_LOG, "info");
+        {
+            if debug_mode {
+                env::set_var(RUST_LOG, "info");
+            } else {
+                env::set_var(RUST_LOG, "warn");
+            }
+        }
     }
 
-    log_builder()
-        .default_format()
-        .format_timestamp_nanos()
-        .format_indent(Some(4))
-        .init();
+    log_builder().default_format().format_timestamp_nanos().format_indent(Some(4)).init();
 }
