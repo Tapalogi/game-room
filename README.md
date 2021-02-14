@@ -4,9 +4,22 @@ Proof of Concept of Game Room in Actix Websocket
 
 ## Command Line Help
 
+- Bash Shell:
+
 ```bash
 > RUSTFLAGS="-C target-cpu=native -C link-args=-s" cargo run --release -- --help
+```
 
+- PowerShell:
+
+```powershell
+> $env:RUSTFLAGS="-C link-args=-s -C target-feature=+crt-static -C target-cpu=native"
+> cargo run --release -- --help
+```
+
+- Result:
+
+```text
 game-room 0.1.0
 PoC - Game Room Router
 
