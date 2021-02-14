@@ -76,7 +76,10 @@ impl MessageHandler<InterActorMessage> for GameRoomRouterActor {
                             self.server_handle.as_ref().unwrap().1.do_send(message_stream)
                         }
                         MessageCode::Special => {
-                            let mut room_count = message_stream.payload.len();
+                            let mut room_list = message_stream.payload;
+                            room_list.sort();
+                            room_list.dedup();
+                            let mut room_count = room_list.len();
 
                             if room_count > 256 {
                                 room_count = 256;
@@ -86,7 +89,7 @@ impl MessageHandler<InterActorMessage> for GameRoomRouterActor {
                                 write_guard.resize(room_count, 0);
 
                                 for i in 0..room_count {
-                                    *write_guard.get_mut(i).unwrap() = message_stream.payload[i];
+                                    *write_guard.get_mut(i).unwrap() = room_list[i];
                                 }
                             }
                         }
