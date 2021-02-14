@@ -2,22 +2,44 @@
 
 Proof of Concept of Game Room in Actix Websocket
 
+## Endpoints
+
+For development conveniency, we recommend the use of [websocat](https://github.com/vi/websocat).
+
+- Query available room (respon is json array of room id)
+
+```bash
+curl http://{url}:{port}/
+```
+
+- Websocket Join (Server)
+
+```ws
+websocat -E ws://{url}:{port}/server?client_id={server_uuid}
+```
+
+- Websocket Join (Client)
+
+```ws
+websocat -E ws://{url}:{port}/client?client_id={server_uuid}
+```
+
 ## Command Line Help
 
-- Bash Shell:
+- Bash Shell
 
 ```bash
 > RUSTFLAGS="-C target-cpu=native -C link-args=-s" cargo run --release -- --help
 ```
 
-- PowerShell:
+- PowerShell
 
 ```powershell
 > $env:RUSTFLAGS="-C link-args=-s -C target-feature=+crt-static -C target-cpu=native"
 > cargo run --release -- --help
 ```
 
-- Result:
+- Result
 
 ```text
 game-room 0.1.0
