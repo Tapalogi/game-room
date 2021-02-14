@@ -70,8 +70,26 @@ impl MessageHandler<InterActorMessage> for GameRoomRouterActor {
                         write_guard.clear();
                     }
 
-                    self.game_rooms.clear();
+                    // This will be a recursive call to this branch
+                    let game_room_iter = self.game_rooms.iter();
+
+                    for (_, rooms) in game_room_iter {
+                        let room_iter = rooms.iter();
+
+                        for (party_id_raw, room_client) in room_iter {
+                            room_client.do_send(InterActorMessage::Disconnect(PartyId::from_u32(
+                                *party_id_raw,
+                            )));
+                        }
+                    }
+
                     self.server_handle = None;
+                } else {
+                    let game_room_iter = self.game_rooms.iter_mut();
+
+                    for (_, rooms) in game_room_iter {
+                        rooms.remove(&party_id.get_repr());
+                    }
                 }
             }
             InterActorMessage::NewMessage(party_id, message_stream) => {
@@ -79,7 +97,11 @@ impl MessageHandler<InterActorMessage> for GameRoomRouterActor {
                     match message_stream.message_code {
                         MessageCode::Normal => {
                             // TODO do proper message routing
-                            self.server_handle.as_ref().unwrap().1.do_send(message_stream)
+                            self.server_handle
+                                .as_ref()
+                                .unwrap()
+                                .1
+                                .do_send(InterActorMessage::NewMessage(party_id, message_stream));
                         }
                         MessageCode::Special => {
                             let mut room_list = message_stream.payload;

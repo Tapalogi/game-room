@@ -5,8 +5,8 @@ use crate::ws_handlers::{
 use crate::CLIENT_TIMEOUT;
 use actix::clock::Instant;
 use actix::{
-    Actor as ActixActor, ActorContext, Addr as ActorAddress, AsyncContext, Handler as SendHandler,
-    Running, StreamHandler as ReceiveHandler,
+    Actor as ActixActor, ActorContext, Addr as ActorAddress, AsyncContext, Handler, Running,
+    StreamHandler as ReceiveHandler,
 };
 use actix_web_actors::ws::{
     CloseReason, Message as WsMessage, ProtocolError as WsProtocolError, WebsocketContext,
@@ -67,11 +67,21 @@ impl ActixActor for ServerActor {
     }
 }
 
-impl SendHandler<MessageStream> for ServerActor {
+impl Handler<InterActorMessage> for ServerActor {
     type Result = ();
 
-    fn handle(&mut self, message: MessageStream, context: &mut Self::Context) {
-        context.binary(message.into_raw());
+    fn handle(&mut self, message: InterActorMessage, context: &mut Self::Context) {
+        match message {
+            InterActorMessage::Disconnect(party_id) => {
+                if party_id == self.party_id {
+                    Self::close_and_disconnect(context, None);
+                }
+            }
+            InterActorMessage::NewMessage(_, binary_message) => {
+                context.binary(binary_message.into_raw());
+            }
+            _ => (),
+        }
     }
 }
 
