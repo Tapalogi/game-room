@@ -1,3 +1,5 @@
+.venv/
+.vscode/
 target/
 
 Cargo.lock

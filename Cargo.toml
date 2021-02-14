@@ -1,6 +1,6 @@
 [package]
 name = "game-room"
-version = "0.1.0"
+version = "0.1.0-alpha.0"
 authors = ["Aditya Kresna <aditya.kresna@outlook.co.id>"]
 edition = "2018"
 

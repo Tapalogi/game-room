@@ -21,7 +21,7 @@ use serde::Deserialize;
 use serde_json::to_string_pretty as to_json_pretty;
 use std::io::Result as IOResult;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 use structopt::StructOpt;
 use utils::init_logger;
 use uuid::Uuid;
@@ -58,13 +58,13 @@ pub(crate) struct HttpSharedState {
     server_joined: Arc<AtomicBool>,
     client_counter: Mutex<Vec<u32>>,
     acceptable_server_uuid: Uuid,
-    available_rooms: Arc<RwLock<Vec<u8>>>,
+    available_rooms: Arc<Mutex<Vec<u8>>>,
     router_address: ActorAddress<GameRoomRouterActor>,
 }
 
 #[get("/")]
 async fn get_available_rooms(shared_state: SharedData<HttpSharedState>) -> impl Responder {
-    match shared_state.available_rooms.read() {
+    match shared_state.available_rooms.lock() {
         Err(_) => HttpResponse::InternalServerError().body("Memory poisoning detected!").await,
         Ok(read_guard) => {
             let available_rooms_clone = (*read_guard).clone();
@@ -125,36 +125,59 @@ async fn ws_client_upgrade(
     request: HttpRequest,
     stream: Payload,
 ) -> impl Responder {
+    if !shared_state.server_joined.load(Ordering::Relaxed) {
+        return HttpResponse::Forbidden().body("Server has not joined yet!").await;
+    }
+
     let client_id = query_params.client_id;
     let room_id = query_params.room_id;
     let room_id_usize = room_id as usize;
 
-    match shared_state.client_counter.lock() {
+    match shared_state.available_rooms.lock() {
         Err(_) => HttpResponse::InternalServerError().body("Memory poisoning detected!").await,
-        Ok(mut client_counter_guard) => {
-            if client_counter_guard[room_id_usize] >= ALL_CLIENT_ID {
-                return HttpResponse::InternalServerError()
-                    .body(format!("Server needs to rejoin for room {} is exhausted!", room_id))
-                    .await;
+        Ok(read_guard) => {
+            if !read_guard.contains(&room_id) {
+                return HttpResponse::Forbidden().body(format!("No room {}!", room_id)).await;
             }
 
-            let party_id = PartyId::from_u32(client_counter_guard[room_id_usize]);
-            client_counter_guard[room_id_usize] += 1;
-            let client_actor =
-                ClientActor::new(party_id, client_id, shared_state.router_address.clone());
+            match shared_state.client_counter.lock() {
+                Err(_) => {
+                    HttpResponse::InternalServerError().body("Memory poisoning detected!").await
+                }
+                Ok(mut client_counter_guard) => {
+                    if client_counter_guard[room_id_usize] >= ALL_CLIENT_ID {
+                        return HttpResponse::InternalServerError()
+                            .body(format!(
+                                "Server needs to rejoin for room {} is exhausted!",
+                                room_id
+                            ))
+                            .await;
+                    }
 
-            match ws_start(client_actor, &request, stream) {
-                Err(error) => HttpResponse::InternalServerError().body(error.to_string()).await,
-                Ok((client_address, response)) => {
-                    shared_state.router_address.do_send(InterActorMessage::ClientConnect(
-                        room_id,
-                        party_id,
-                        client_id,
-                        client_address,
-                    ));
-                    info!("Client with client id {} just joined to room {}...", client_id, room_id);
+                    let party_id = PartyId::from_u32(client_counter_guard[room_id_usize]);
+                    client_counter_guard[room_id_usize] += 1;
+                    let client_actor =
+                        ClientActor::new(party_id, client_id, shared_state.router_address.clone());
 
-                    response.await
+                    match ws_start(client_actor, &request, stream) {
+                        Err(error) => {
+                            HttpResponse::InternalServerError().body(error.to_string()).await
+                        }
+                        Ok((client_address, response)) => {
+                            shared_state.router_address.do_send(InterActorMessage::ClientConnect(
+                                room_id,
+                                party_id,
+                                client_id,
+                                client_address,
+                            ));
+                            info!(
+                                "Client with client id {} just joined to room {}...",
+                                client_id, room_id
+                            );
+
+                            response.await
+                        }
+                    }
                 }
             }
         }
@@ -167,19 +190,14 @@ async fn main() -> IOResult<()> {
     init_logger(options.debug_mode);
     let listen_socket = format!("0.0.0.0:{}", options.listen_port);
 
-    let available_rooms = Arc::new(RwLock::new(Vec::new()));
+    let available_rooms = Arc::new(Mutex::new(Vec::new()));
     let server_joined = Arc::new(AtomicBool::new(false));
-    let mut client_counter = Vec::new();
-
-    for _ in 0..256 {
-        client_counter.push(0);
-    }
 
     let router_address =
         GameRoomRouterActor::new(available_rooms.clone(), server_joined.clone()).start();
     let shared_state = SharedData::new(HttpSharedState {
         available_rooms: available_rooms.clone(),
-        client_counter: Mutex::new(client_counter),
+        client_counter: Mutex::new(vec![0; 256]),
         acceptable_server_uuid: options.server_uuid,
         router_address,
         server_joined,

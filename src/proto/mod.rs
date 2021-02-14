@@ -85,17 +85,11 @@ impl PartyId {
     }
 
     pub(crate) fn is_single_client_id(&self) -> bool {
-        match self {
-            Self::Client(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Client(_))
     }
 
     pub(crate) fn is_single_server_id(&self) -> bool {
-        match self {
-            Self::Server(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Server(_))
     }
 }
 
@@ -119,7 +113,11 @@ impl MessageStream {
         payload_kind: PayloadKind,
         payload: Option<&[u8]>,
     ) -> Self {
-        let payload = if payload.is_none() { Vec::new() } else { payload.unwrap().into() };
+        let payload = if let Some(payload_unwrapped) = payload {
+            payload_unwrapped.to_vec()
+        } else {
+            Vec::new()
+        };
 
         Self { message_code, room_id, origin_id, destination_id, payload_kind, payload }
     }
