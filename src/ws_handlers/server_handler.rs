@@ -12,17 +12,23 @@ use actix_web_actors::ws::{
     CloseReason, Message as WsMessage, ProtocolError as WsProtocolError, WebsocketContext,
 };
 use log::{info, warn};
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub(crate) struct ServerActor {
     party_id: PartyId,
+    client_id: Uuid,
     last_known_activity: Instant,
     router_actor: ActorAddress<GameRoomRouterActor>,
 }
 
 impl ServerActor {
-    pub(crate) fn new(party_id: PartyId, router_actor: ActorAddress<GameRoomRouterActor>) -> Self {
-        Self { party_id, last_known_activity: Instant::now(), router_actor }
+    pub(crate) fn new(
+        party_id: PartyId,
+        client_id: Uuid,
+        router_actor: ActorAddress<GameRoomRouterActor>,
+    ) -> Self {
+        Self { party_id, client_id, last_known_activity: Instant::now(), router_actor }
     }
 
     pub(crate) fn heartbeat(&self, context: &mut WebsocketContext<Self>) {
@@ -62,7 +68,8 @@ impl ActixActor for ServerActor {
     }
 
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
-        self.router_actor.do_send(InterActorMessage::Disconnect(self.party_id));
+        self.router_actor
+            .do_send(InterActorMessage::Disconnect(self.party_id, Some(self.client_id)));
         Running::Stop
     }
 }
@@ -72,7 +79,7 @@ impl Handler<InterActorMessage> for ServerActor {
 
     fn handle(&mut self, message: InterActorMessage, context: &mut Self::Context) {
         match message {
-            InterActorMessage::Disconnect(party_id) => {
+            InterActorMessage::Disconnect(party_id, _) => {
                 if party_id == self.party_id {
                     Self::close_and_disconnect(context, None);
                 }

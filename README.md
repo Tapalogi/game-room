@@ -21,7 +21,7 @@ websocat -E ws://{url}:{port}/server?client_id={server_uuid}
 - Websocket Join (Client)
 
 ```ws
-websocat -E ws://{url}:{port}/client?client_id={server_uuid}
+websocat -E ws://{url}:{port}/client?client_id={server_uuid}&room_id={room_id}
 ```
 
 ## Command Line Help
