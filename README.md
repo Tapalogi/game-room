@@ -2,6 +2,35 @@
 
 Proof of Concept of Game Room in Actix Websocket
 
+## Working Demo
+
+- Run the GameRoom
+
+```bash
+> # bash
+> RUSTFLAGS="-C target-cpu=native -C link-args=-s" cargo run --release -- --debug-mode
+```
+
+```powershell
+> # powershell
+> $env:RUSTFLAGS="-C link-args=-s -C target-feature=+crt-static -C target-cpu=native"
+> cargo run --release -- --debug-mode
+```
+
+- Run the Server
+
+```bash
+> # ensure the package "websocket_client" is installed
+> python server-emulator.py
+```
+
+- Run the Client
+
+```bash
+> # ensure the package "websocket_client" is installed
+> python client-emulator.py
+```
+
 ## Endpoints
 
 For development conveniency, we recommend the use of [websocat](https://github.com/vi/websocat).
@@ -42,7 +71,7 @@ websocat -E ws://{url}:{port}/client?client_id={server_uuid}&room_id={room_id}
 - Result
 
 ```text
-game-room 0.1.0
+game-room 0.1.0-alpha.0
 PoC - Game Room Router
 
 USAGE:
