@@ -11,7 +11,7 @@ use actix::{
 use actix_web_actors::ws::{
     CloseReason, Message as WsMessage, ProtocolError as WsProtocolError, WebsocketContext,
 };
-use log::warn;
+use log::{info, warn};
 
 #[derive(Debug)]
 pub(crate) struct ServerActor {
@@ -28,6 +28,11 @@ impl ServerActor {
     pub(crate) fn heartbeat(&self, context: &mut WebsocketContext<Self>) {
         context.run_interval(HEARTBEAT_INTERVAL, |actor, context| {
             if Instant::now().duration_since(actor.last_known_activity) > CLIENT_TIMEOUT {
+                info!(
+                    "Party ID {} kicked because of {:#?} inactivity!",
+                    actor.party_id.get_repr(),
+                    CLIENT_TIMEOUT,
+                );
                 Self::close_and_disconnect(context, None);
             } else {
                 context.ping(b"");

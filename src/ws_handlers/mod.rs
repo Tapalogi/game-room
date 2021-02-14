@@ -64,8 +64,14 @@ impl MessageHandler<InterActorMessage> for GameRoomRouterActor {
             }
             InterActorMessage::Disconnect(party_id) => {
                 if party_id == PartyId::Server(0) {
-                    self.server_handle = None;
                     self.server_joined.store(false, Ordering::Relaxed);
+
+                    if let Ok(mut write_guard) = self.available_rooms.write() {
+                        write_guard.clear();
+                    }
+
+                    self.game_rooms.clear();
+                    self.server_handle = None;
                 }
             }
             InterActorMessage::NewMessage(party_id, message_stream) => {

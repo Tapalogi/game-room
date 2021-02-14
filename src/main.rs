@@ -16,6 +16,7 @@ use actix_web::{
     get, main as actix_main, App, FromRequest, HttpRequest, HttpResponse, HttpServer, Responder,
 };
 use actix_web_actors::ws::start_with_addr as ws_start;
+use log::info;
 use serde::Deserialize;
 use serde_json::to_string_pretty as to_json_pretty;
 use std::io::Result as IOResult;
@@ -75,15 +76,6 @@ async fn ws_server_upgrade(
     request: HttpRequest,
     stream: Payload,
 ) -> impl Responder {
-    //let query_string = request.query_string();
-
-    //if !query_string.contains("client_id") {
-    //    return HttpResponse::NotAcceptable().body("Please specify client_id!").await;
-    //}
-
-    //let client_id;
-    //let queries = query_string.split("&");
-
     let client_id = query_params.client_id;
 
     // Check if the request is server connection and deny if already a server in this instance
@@ -100,11 +92,17 @@ async fn ws_server_upgrade(
         let server_actor = ServerActor::new(server_party_id, shared_state.router_address.clone());
 
         match ws_start(server_actor, &request, stream) {
-            Err(error) => HttpResponse::InternalServerError().body(error.to_string()).await,
+            Err(error) => {
+                shared_state.server_joined.store(false, Ordering::Relaxed);
+
+                HttpResponse::InternalServerError().body(error.to_string()).await
+            }
             Ok((server_address, response)) => {
                 shared_state
                     .router_address
                     .do_send(InterActorMessage::ServerConnect(server_party_id, server_address));
+                info!("Server with client id {} just joined...", client_id);
+
                 response.await
             }
         }
